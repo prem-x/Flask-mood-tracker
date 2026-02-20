@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  mood-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mood-tracker-dev
+    ports:
+      - "${PORT:-5000}:5000"
+    volumes:
+      # Bind mounts for live code updates during development
+      - ./app.py:/app/app.py:ro
+      - ./templates:/app/templates:ro
+      # Persistent data volume (survives container restarts)
+      - mood_data:/app/data
+    environment:
+      FLASK_ENV: development
+      FLASK_DEBUG: 1
+      FLASK_APP: app.py
+      PORT: ${PORT:-5000}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    # Docker Compose watch for hot reload (sync + rebuild on file changes)
+    develop:
+      watch:
+        # Sync Python app code (no container rebuild needed)
+        - action: sync
+          path: ./app.py
+          target: /app/app.py
+        # Sync templates (no container rebuild needed)
+        - action: sync
+          path: ./templates
+          target: /app/templates
+        # Rebuild container if dependencies change
+        - action: rebuild
+          path: ./requirements.txt
+
+# Named volume for persistent mood tracking data
+volumes:
+  mood_data:
+    driver: local
